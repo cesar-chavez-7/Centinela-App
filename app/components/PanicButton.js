@@ -104,7 +104,29 @@ const PanicButton = ({ onEmergency }) => {
   };
 
   const activateEmergency = () => {
-    Vibration.vibrate([0, 500, 200, 500]);
+    // Patrón SOS en código Morse: ... --- ... (3 cortos, 3 largos, 3 cortos)
+    const sosPattern = [
+      0,    // Espera inicial
+      200,  // .
+      100,  // pausa
+      200,  // .
+      100,  // pausa
+      200,  // .
+      300,  // pausa entre letras
+      600,  // -
+      100,  // pausa
+      600,  // -
+      100,  // pausa
+      600,  // -
+      300,  // pausa entre letras
+      200,  // .
+      100,  // pausa
+      200,  // .
+      100,  // pausa
+      200,  // .
+    ];
+    
+    Vibration.vibrate(sosPattern);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     
     if (onEmergency) {
@@ -121,12 +143,6 @@ const PanicButton = ({ onEmergency }) => {
     inputRange: [0, 1],
     outputRange: [0.3, 0.8],
   });
-
-  // Constantes para tamaños (para que siempre coincidan)
-  const BUTTON_SIZE = 170;
-  const BORDER_WIDTH = 5;
-  const PROGRESS_SPACING = 8; // Espacio entre botón y círculo de progreso
-  const PROGRESS_SIZE = BUTTON_SIZE + (BORDER_WIDTH * 2) + (PROGRESS_SPACING * 2);
 
   return (
     <View style={styles.container}>
@@ -147,9 +163,6 @@ const PanicButton = ({ onEmergency }) => {
           style={[
             styles.progressCircle,
             {
-              width: PROGRESS_SIZE,
-              height: PROGRESS_SIZE,
-              borderRadius: PROGRESS_SIZE / 2,
               transform: [{ rotate: progressRotation }],
             },
           ]}
@@ -211,19 +224,20 @@ const styles = StyleSheet.create({
     paddingVertical: THEME.spacing.xxl,
     minHeight: 300,
   },
-  glowCircle: {
-    position: 'absolute',
-    width: 170,
-    height:150,
-    borderRadius: 120,
-    backgroundColor: 'rgba(220, 20, 60, 0.15)',
-  },
   progressCircle: {
-    position: 'absolute',
-    borderWidth: 3,
-    borderColor: 'transparent',
-    borderTopColor: THEME.colors.emergency,
-    borderRightColor: THEME.colors.emergency,
+  position: 'absolute',
+  borderWidth: 0,
+  borderColor: 'transparent',
+  borderTopColor: THEME.colors.emergency,
+  borderRightColor: THEME.colors.emergency,
+  // Agrega estas propiedades:
+  //width: 170, // 10px más que el botón (170 + 10)
+  //height: 170, // 10px más que el botón (170 + 10)
+  //borderRadius: 30, // la mitad de width/height
+  top: '20%', // Centra verticalmente
+  left: '-5%', // Centra horizontalmente
+  //marginLeft: -90, // Compensa la mitad del width (180/2 = 90)
+  //marginTop: -90, // Compensa la mitad del height (180/2 = 90)
   },
   progressSegment: {
     width: '10%',

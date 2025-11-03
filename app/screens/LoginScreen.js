@@ -15,6 +15,13 @@ import { THEME } from '../theme/theme';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp } from 'firebase/app';
+import { firebaseConfig } from '../../firebase.config';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
 const LoginScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   
@@ -32,14 +39,75 @@ const LoginScreen = ({ navigation }) => {
   const onSubmit = async (data) => {
     setLoading(true);
     
-    // Simular login
-    setTimeout(() => {
-      console.log('Login data:', data);
+    try {
+      console.log('Intentando iniciar sesión con:', data.email);
+
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
+      console.log('Sesión iniciada con éxito:', user.email);
       setLoading(false);
-      
-      // Navegar al Home
+
+      // Navegar a la pantalla principal
       navigation.replace('Home');
-    }, 1500);
+    } catch (error) {
+      setLoading(false);
+      console.error('Error al iniciar sesión:', error);
+
+      let errorMessage = 'Error al iniciar sesión. Por favor, intenta de nuevo.';
+      // Manejo de errores específicos
+      switch (error.code) {
+        case 'auth/invalid-email':
+          errorMessage = 'El formato del email es inválido.';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = 'Esta cuenta ha sido deshabilitada.';
+          break;
+        case 'auth/user-not-found':
+          errorMessage = 'No se encontró una cuenta con este email.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'La contraseña es incorrecta.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Demasiados intentos fallidos. Por favor, intenta más tarde.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Error de red. Por favor, verifica tu conexión.';
+          break;
+        default:
+          errorMessage = error.message || 'Error desconocido';
+      }
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  // Función para recuperar contraseña 
+  const handleForgotPassword = () => {
+    Alert.prompt(
+      'Recuperar Contraseña',
+      'Ingresa tu correo para enviarte un enlace de recuperación:',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Enviar',
+          onPress: async (email) => {
+            if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+              try {
+                Alert.alert('Éxito', `Enlace enviado a: ${email}`);
+              } catch (error) {
+                Alert.alert('Error', 'No se pudo enviar el email');
+              }
+            } else {
+              Alert.alert('Error', 'Ingresa un email válido');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   return (
@@ -84,6 +152,7 @@ const LoginScreen = ({ navigation }) => {
                   error={errors.email?.message}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!loading}
                 />
               )}
             />
@@ -108,6 +177,7 @@ const LoginScreen = ({ navigation }) => {
                   onChangeText={onChange}
                   error={errors.password?.message}
                   secureTextEntry
+                  editable={!loading}
                 />
               )}
             />
@@ -115,19 +185,21 @@ const LoginScreen = ({ navigation }) => {
             {/* Forgot Password */}
             <TouchableOpacity
               style={styles.forgotPasswordContainer}
-              onPress={() => Alert.alert('Recuperar contraseña', 'Función próximamente')}
+              onPress={handleForgotPassword}
+              disabled={loading}
             >
-              <Text style={styles.forgotPasswordText}>
+              <Text style={[styles.forgotPasswordText, loading && styles.disabledText]}>
                 ¿Olvidaste tu contraseña?
               </Text>
             </TouchableOpacity>
 
             {/* Login Button */}
             <Button
-              title="Iniciar Sesión"
+              title={loading ? "Iniciando sesión..." : "Iniciar Sesión"}
               onPress={handleSubmit(onSubmit)}
               loading={loading}
               style={styles.loginButton}
+              disabled={loading}
             />
 
             {/* Divider */}
@@ -140,8 +212,13 @@ const LoginScreen = ({ navigation }) => {
             {/* Register Link */}
             <View style={styles.registerContainer}>
               <Text style={styles.registerText}>¿No tienes cuenta? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                <Text style={styles.registerLink}>Regístrate</Text>
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('Register')}
+                disabled={loading}
+              >
+                <Text style={[styles.registerLink, loading && styles.disabledText]}>
+                  Regístrate
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -231,6 +308,9 @@ const styles = StyleSheet.create({
     ...THEME.typography.body,
     color: THEME.colors.accent,
     fontWeight: '600',
+  },
+  disabledText: {
+    opacity: 0.5,
   },
 });
 

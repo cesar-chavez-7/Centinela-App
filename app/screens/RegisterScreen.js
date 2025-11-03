@@ -8,12 +8,20 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { THEME } from '../theme/theme';
 import Input from '../components/common/Input';
 import PhoneInput from '../components/common/PhoneInput';
 import Button from '../components/common/Button';
+
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp } from 'firebase/app';
+import { firebaseConfig } from '../../firebase.config';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 const RegisterScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
@@ -44,11 +52,65 @@ const RegisterScreen = ({ navigation }) => {
   const onSubmit = async (data) => {
     setLoading(true);
     
-    setTimeout(() => {
-      console.log('Register data:', data);
+    try {
+      console.log('Intentando registrar usuario:', data.email);
+
+      // CREAR USUARIO EN FIREBASE AUTHENTICATION
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        data.email, 
+        data.password
+      );
+      
+      const user = userCredential.user;
+      console.log('Usuario registrado con éxito:', user.email);
+      
+     
       setLoading(false);
-      navigation.replace('Home');
-    }, 1500);
+
+      Alert.alert(
+        '¡Registro exitoso!', 
+        `Tu cuenta ha sido creada correctamente. Bienvenido/a ${data.name}`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => navigation.replace('Home') 
+          }
+        ]
+      );
+      
+    } catch (error) {
+      setLoading(false);
+      console.error('Error en registro:', error);
+
+      let errorMessage = 'Error al crear la cuenta. Por favor, intenta de nuevo.';
+      
+      // MANEJO ESPECÍFICO DE ERRORES DE FIREBASE
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'Ya existe una cuenta con este email.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'El formato del email es inválido.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'El registro con email/contraseña no está habilitado.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'La contraseña es muy débil. Usa al menos 6 caracteres.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Error de red. Verifica tu conexión a internet.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Demasiados intentos. Por favor, intenta más tarde.';
+          break;
+        default:
+          errorMessage = error.message || 'Error desconocido al registrar usuario.';
+      }
+      
+      Alert.alert('Error en registro', errorMessage);
+    }
   };
 
   return (
@@ -65,8 +127,9 @@ const RegisterScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
+              disabled={loading} 
             >
-              <Text style={styles.backIcon}>←</Text>
+              <Text style={[styles.backIcon, loading && styles.disabledText]}>←</Text>
             </TouchableOpacity>
             
             <Text style={styles.logo}>🛡️</Text>
@@ -79,10 +142,10 @@ const RegisterScreen = ({ navigation }) => {
               control={control}
               name="name"
               rules={{
-                required: 'El nombre es requerido',
+                required: 'El nombre es obligatorio.',
                 minLength: {
                   value: 3,
-                  message: 'El nombre debe tener al menos 3 caracteres',
+                  message: 'El nombre debe tener al menos 3 caracteres.',
                 },
               }}
               render={({ field: { onChange, value } }) => (
@@ -94,6 +157,7 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={onChange}
                   error={errors.name?.message}
                   autoCapitalize="words"
+                  editable={!loading} 
                 />
               )}
             />
@@ -102,7 +166,7 @@ const RegisterScreen = ({ navigation }) => {
               control={control}
               name="email"
               rules={{
-                required: 'El email es requerido',
+                required: 'El email es obligatorio',
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                   message: 'Email inválido',
@@ -118,6 +182,7 @@ const RegisterScreen = ({ navigation }) => {
                   error={errors.email?.message}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!loading} 
                 />
               )}
             />
@@ -126,7 +191,7 @@ const RegisterScreen = ({ navigation }) => {
               control={control}
               name="phone"
               rules={{
-                required: 'El teléfono es requerido',
+                required: 'El teléfono es obligatorio',
                 minLength: {
                   value: phoneConfig.minDigits,
                   message: `El teléfono debe tener ${phoneConfig.minDigits} dígitos`,
@@ -150,6 +215,7 @@ const RegisterScreen = ({ navigation }) => {
                     setValue('phone', '');
                   }}
                   error={errors.phone?.message}
+                  editable={!loading} 
                 />
               )}
             />
@@ -158,7 +224,7 @@ const RegisterScreen = ({ navigation }) => {
               control={control}
               name="password"
               rules={{
-                required: 'La contraseña es requerida',
+                required: 'La contraseña es obligatoria',
                 minLength: {
                   value: 6,
                   message: 'La contraseña debe tener al menos 6 caracteres',
@@ -173,6 +239,7 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={onChange}
                   error={errors.password?.message}
                   secureTextEntry
+                  editable={!loading}
                 />
               )}
             />
@@ -194,15 +261,17 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={onChange}
                   error={errors.confirmPassword?.message}
                   secureTextEntry
+                  editable={!loading} 
                 />
               )}
             />
 
             <Button
-              title="Crear Cuenta"
+              title={loading ? "Creando cuenta..." : "Crear Cuenta"}
               onPress={handleSubmit(onSubmit)}
               loading={loading}
               style={styles.registerButton}
+              disabled={loading}
             />
 
             <Text style={styles.termsText}>
@@ -213,8 +282,13 @@ const RegisterScreen = ({ navigation }) => {
 
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-              <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Text style={styles.loginLink}>Inicia Sesión</Text>
+              <TouchableOpacity 
+                onPress={() => navigation.goBack()}
+                disabled={loading} 
+              >
+                <Text style={[styles.loginLink, loading && styles.disabledText]}>
+                  Inicia Sesión
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -299,6 +373,9 @@ const styles = StyleSheet.create({
     ...THEME.typography.body,
     color: THEME.colors.accent,
     fontWeight: '600',
+  },
+  disabledText: {
+    opacity: 0.5,
   },
 });
 

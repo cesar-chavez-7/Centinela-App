@@ -4,14 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Tu configuración de Firebase
 // (La obtendrás de Firebase Console después)
-const firebaseConfig = {
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "centinela-app.firebaseapp.com",
-  databaseURL: "https://centinela-app-default-rtdb.firebaseio.com",
-  projectId: "centinela-app",
-  storageBucket: "centinela-app.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:android:abcdef"
+
+export const firebaseConfig = {
+  apiKey: "AIzaSyDbmCD7JD1WHNUsp4Q0YJ2XxpHF74Qib_c",
+  authDomain: "centinela-45356.firebaseapp.com",
+  projectId: "centinela-45356",
+  storageBucket: "centinela-45356.firebasestorage.app",
+  messagingSenderId: "885679268493",
+  appId: "1:885679268493:web:b78779db6b273e3f7ff8c4"
 };
 
 // Inicializar Firebase

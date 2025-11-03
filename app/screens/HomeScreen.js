@@ -25,9 +25,13 @@ const HomeScreen = ({ navigation }) => {
     }).start();
   }, []);
 
-  const handleEmergency = () => {
-    navigation.navigate('EmergencyActive');
-  };
+  const handleEmergency = (emergencyId, location) => {
+  navigation.navigate('EmergencyActive', { 
+    emergencyId, 
+    location 
+  });
+};
+
 
   const quickActions = [
     {

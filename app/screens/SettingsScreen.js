@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { THEME } from '../theme/theme';
 
 const SettingsScreen = ({ navigation }) => {
@@ -22,7 +25,118 @@ const SettingsScreen = ({ navigation }) => {
     autoCall: false,
   });
 
-  const toggleSetting = (key) => {
+  const [loading, setLoading] = useState(true);
+  const [permissionsStatus, setPermissionsStatus] = useState({
+    location: 'unknown',
+    notifications: 'unknown',
+  });
+
+  // Cargar settings al montar
+  useEffect(() => {
+    loadSettings();
+    checkPermissions();
+  }, []);
+
+  // Guardar settings cuando cambien
+  useEffect(() => {
+    if (!loading) {
+      saveSettings();
+    }
+  }, [settings]);
+
+  // Cargar configuraciones guardadas
+  const loadSettings = async () => {
+    try {
+      const savedSettings = await AsyncStorage.getItem('app_settings');
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error cargando settings:', error);
+      setLoading(false);
+    }
+  };
+
+  // Guardar configuraciones
+  const saveSettings = async () => {
+    try {
+      await AsyncStorage.setItem('app_settings', JSON.stringify(settings));
+      console.log('✅ Settings guardados');
+    } catch (error) {
+      console.error('❌ Error guardando settings:', error);
+    }
+  };
+
+  // Verificar permisos
+  const checkPermissions = async () => {
+    try {
+      // Verificar ubicación
+      const locationStatus = await Location.getForegroundPermissionsAsync();
+      
+      // Verificar notificaciones
+      const notificationStatus = await Notifications.getPermissionsAsync();
+
+      setPermissionsStatus({
+        location: locationStatus.status,
+        notifications: notificationStatus.status,
+      });
+    } catch (error) {
+      console.error('Error verificando permisos:', error);
+    }
+  };
+
+  // Toggle con lógica especial
+  const toggleSetting = async (key) => {
+    // GPS - Solicitar permisos si se activa
+    if (key === 'gps' && !settings.gps) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso requerido',
+          'Necesitas permitir el acceso a la ubicación para usar esta función.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Abrir ajustes', onPress: () => Linking.openSettings() }
+          ]
+        );
+        return;
+      }
+      
+      setPermissionsStatus({ ...permissionsStatus, location: status });
+    }
+
+    // Notificaciones - Solicitar permisos si se activa
+    if (key === 'notifications' && !settings.notifications) {
+      const { status } = await Notifications.requestPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso requerido',
+          'Necesitas permitir las notificaciones para recibir alertas.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Abrir ajustes', onPress: () => Linking.openSettings() }
+          ]
+        );
+        return;
+      }
+      
+      setPermissionsStatus({ ...permissionsStatus, notifications: status });
+    }
+
+    // Modo oscuro
+    if (key === 'darkMode') {
+      Alert.alert(
+        'Próximamente',
+        'El modo oscuro estará disponible en una próxima actualización.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Actualizar setting
     setSettings({ ...settings, [key]: !settings[key] });
   };
 
@@ -63,7 +177,9 @@ const SettingsScreen = ({ navigation }) => {
           id: 'gps',
           icon: 'navigate-outline',
           label: 'GPS siempre activo',
-          description: 'Mantener GPS activo en segundo plano',
+          description: permissionsStatus.location === 'granted' 
+            ? 'GPS autorizado' 
+            : 'Necesita permiso',
           type: 'switch',
           value: settings.gps,
         },
@@ -73,7 +189,7 @@ const SettingsScreen = ({ navigation }) => {
           label: 'Preferencias de ubicación',
           description: 'Configurar precisión y frecuencia',
           type: 'navigate',
-          onPress: () => console.log('Location settings'),
+          onPress: () => handleLocationSettings(),
         },
       ],
     },
@@ -84,7 +200,9 @@ const SettingsScreen = ({ navigation }) => {
           id: 'notifications',
           icon: 'notifications-outline',
           label: 'Notificaciones push',
-          description: 'Recibir alertas de contactos',
+          description: permissionsStatus.notifications === 'granted'
+            ? 'Notificaciones autorizadas'
+            : 'Necesita permiso',
           type: 'switch',
           value: settings.notifications,
         },
@@ -99,7 +217,7 @@ const SettingsScreen = ({ navigation }) => {
           label: 'Contactos de emergencia',
           description: 'Administrar contactos',
           type: 'navigate',
-          onPress: () => console.log('Contacts'),
+          onPress: () => handleEmergencyContacts(),
         },
         {
           id: 'privacy',
@@ -107,7 +225,7 @@ const SettingsScreen = ({ navigation }) => {
           label: 'Privacidad y seguridad',
           description: 'Permisos y datos',
           type: 'navigate',
-          onPress: () => console.log('Privacy'),
+          onPress: () => handlePrivacy(),
         },
         {
           id: 'about',
@@ -115,7 +233,7 @@ const SettingsScreen = ({ navigation }) => {
           label: 'Acerca de',
           description: 'Versión 1.0.0',
           type: 'navigate',
-          onPress: () => console.log('About'),
+          onPress: () => handleAbout(),
         },
       ],
     },
@@ -128,7 +246,7 @@ const SettingsScreen = ({ navigation }) => {
           label: 'Editar perfil',
           description: 'Nombre, foto y datos personales',
           type: 'navigate',
-          onPress: () => console.log('Profile'),
+          onPress: () => handleEditProfile(),
         },
         {
           id: 'logout',
@@ -143,6 +261,64 @@ const SettingsScreen = ({ navigation }) => {
     },
   ];
 
+  // Handlers para navegación
+  const handleLocationSettings = () => {
+    Alert.alert(
+      'Preferencias de ubicación',
+      'Aquí podrás configurar:\n\n• Precisión del GPS (Alta/Media/Baja)\n• Frecuencia de actualización\n• Uso de batería',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Configurar', onPress: () => console.log('Location settings') }
+      ]
+    );
+  };
+
+  const handleEmergencyContacts = () => {
+    Alert.alert(
+      'Contactos de emergencia',
+      'Funcionalidad próximamente:\n\n• Agregar contactos\n• Editar contactos\n• Orden de prioridad\n• Mensaje personalizado',
+      [{ text: 'Entendido' }]
+    );
+  };
+
+  const handlePrivacy = () => {
+    Alert.alert(
+      'Privacidad y Seguridad',
+      'Estado de permisos:\n\n' +
+      `📍 Ubicación: ${permissionsStatus.location === 'granted' ? '✅ Autorizado' : '❌ No autorizado'}\n` +
+      `🔔 Notificaciones: ${permissionsStatus.notifications === 'granted' ? '✅ Autorizado' : '❌ No autorizado'}\n\n` +
+      'Todos tus datos están protegidos y encriptados.',
+      [
+        { text: 'Cerrar', style: 'cancel' },
+        { text: 'Ver política', onPress: () => console.log('Privacy policy') }
+      ]
+    );
+  };
+
+  const handleAbout = () => {
+    Alert.alert(
+      '🛡️ Centinela v1.0.0',
+      'Tu guardián personal\n\n' +
+      'Desarrollado por:\n' +
+      '• Steven Alberto Campos Recinos\n' +
+      '• César Francisco Ramírez Chávez\n\n' +
+      'ESFE AGAPE - 2025\n\n' +
+      'Centinela es una aplicación de emergencia personal que te permite alertar a tus contactos de confianza con tu ubicación en tiempo real.',
+      [
+        { text: 'Cerrar', style: 'cancel' },
+        { text: 'Más info', onPress: () => console.log('More info') }
+      ]
+    );
+  };
+
+  const handleEditProfile = () => {
+    Alert.alert(
+      'Editar perfil',
+      'Funcionalidad próximamente:\n\n• Cambiar nombre\n• Foto de perfil\n• Información de contacto\n• Configuración de cuenta',
+      [{ text: 'Entendido' }]
+    );
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Cerrar sesión',
@@ -152,11 +328,28 @@ const SettingsScreen = ({ navigation }) => {
         {
           text: 'Salir',
           style: 'destructive',
-          onPress: () => navigation.replace('Login'),
+          onPress: async () => {
+            // Limpiar datos de sesión si los hay
+            try {
+              await AsyncStorage.removeItem('user_session');
+              console.log('✅ Sesión cerrada');
+            } catch (error) {
+              console.error('Error cerrando sesión:', error);
+            }
+            navigation.replace('Login');
+          },
         },
       ]
     );
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: THEME.colors.text }}>Cargando ajustes...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -251,9 +444,12 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appName}>Centinela</Text>
+          <Text style={styles.appName}>🛡️ Centinela</Text>
           <Text style={styles.appVersion}>Versión 1.0.0 (Beta)</Text>
-          <Text style={styles.appCopyright}>© 2025 Centinela. Todos los derechos reservados.</Text>
+          <Text style={styles.appCopyright}>
+            © 2025 ESFE AGAPE{'\n'}
+            Todos los derechos reservados
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -358,7 +554,7 @@ const styles = StyleSheet.create({
     paddingVertical: THEME.spacing.xl,
   },
   appName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: THEME.colors.text,
     marginBottom: THEME.spacing.xs,
@@ -366,12 +562,13 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: 14,
     color: THEME.colors.textSecondary,
-    marginBottom: THEME.spacing.xs,
+    marginBottom: THEME.spacing.sm,
   },
   appCopyright: {
     fontSize: 12,
     color: THEME.colors.textMuted,
     textAlign: 'center',
+    lineHeight: 18,
   },
 });
 
